@@ -1,27 +1,32 @@
 # CoreProtect migration from SQLite to MySQL
+Even though this script was made to migrate CoreProtect data, it may be used to migrate any SQLite database to MariaDB/MySQL/Percona with little or no modifications.
 
+## Disclaimer
+Due to its nature, this script have some destructive potencial because of `TRUNCATE` statements.
+
+Use at your own risk and know what you are doing.
 ## Configuration (tl;dr)
 
 Copy `_env` file to `.env`
 ```
-cp _env .env
+    cp _env .env
 ```
 
 Then, edit `.env` file to reflect your configuration.
 
 Source it before running:
 ```
-source .env
+    source .env
 ```
 
 Run `bundle` to install required gems:
 ```
-bundle
+    bundle
 ```
 
 Run it
 ```
-ruby ./migration.rb
+    ruby ./migration.rb
 ```
 
 ## Pre requisites
@@ -49,7 +54,12 @@ There is a `_env` file you can use as template.
 Copy `_env` file to `.env` and change the values as needed.
 
 On Linux and macOS, you have to `source` it to load them to current shell session:
+```
+    source ./.env
+```
 
-```
-source ./.env
-```
+## Known issues
+For `co_block` table with 89,000,000+ records, it may take more than 5 hours to migrate.
+
+## Todo
+Docker interactive?
