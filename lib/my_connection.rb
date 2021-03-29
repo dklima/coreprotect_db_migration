@@ -11,7 +11,7 @@ class MyConnection
       password: ENV.fetch('MYSQL_PASS'),
       port: ENV.fetch('MYSQL_PORT'),
       database: ENV.fetch('MYSQL_DATABASE'),
-      encoding: 'utf8',
+      encoding: 'utf8mb4',
       read_timeout: 3600,
       write_timeout: 3600,
       connect_timeout: 3600,
