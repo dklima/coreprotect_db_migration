@@ -1,0 +1,9 @@
+version: '3'
+
+services:
+  migration:
+    build: .
+    volumes:
+      - .:/app
+    env_file:
+      - ./.env
