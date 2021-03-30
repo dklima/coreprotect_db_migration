@@ -47,6 +47,7 @@ Run it
 | `MYSQL_PASS` | password |
 | `MYSQL_DATABASE` | `minecraft` |
 | `MYSQL_PORT` | 3306 |
+| `OFFSET` | 200000 |
 | `SQLITE_DATABASE` | `database.db` |
 
 There is a `_env` file you can use as template.
@@ -58,6 +59,17 @@ On Linux and macOS, you have to `source` it to load them to current shell sessio
     source ./.env
 ```
 
+## FAQ
+### I'm getting the error `Packets larger than max_allowed_packet are not allowed.`
+If you are the MySQL server owner or admin and have access to alter its configurations, increase the `max_allowed_packet` parameter.
+
+You can also try executing the statement:
+```
+    SET GLOBAL max_allowed_packet=1073741824;
+```
+However, keep in mind that it won't be persisted and will be reseted when MySQL server restarts.
+
+If you do not have access to the MySQL configuration, you should try lowering the `OFFSET` value from `.env` file.
 ## Known issues
 For `co_block` table with 89,000,000+ records, it may take more than 5 hours to migrate.
 
