@@ -54,7 +54,7 @@ end
 def lite_select(params = {})
   table = params[:table]
   offset = params[:offset]
-  lite_conn.execute("SELECT * FROM #{table} LIMIT #{ENV.fetch('OFFSET')} OFFSET #{offset}")
+  lite_conn.execute("SELECT * FROM #{table} LIMIT #{ENV.fetch('OFFSET').to_s} OFFSET #{offset}")
 end
 
 def my_prepare_to_insert(params = {})
@@ -104,7 +104,7 @@ lite_tables.each do |table|
       rows << row
     end
     my_prepare_to_insert({ table: table['name'], columns: columns, rows: rows })
-    i += ENV.fetch('OFFSET')
+    i += ENV.fetch('OFFSET').to_i
   end
 
   puts 'done'
