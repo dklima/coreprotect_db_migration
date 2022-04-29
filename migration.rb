@@ -96,15 +96,17 @@ lite_tables.each do |table|
   # Get total fields from the given table
   total_rows = lite_count(table['name'])
 
-  printf "Migrating #{table['name']} with #{total_rows} records... "
+  puts "Migrating #{table['name']} with #{total_rows} records..."
   i = 0
-  until i > total_rows
+  until i >= total_rows
     rows = []
     lite_select({ table: table['name'], offset: i }).each do |row|
       rows << row
     end
     my_prepare_to_insert({ table: table['name'], columns: columns, rows: rows })
-    i += ENV.fetch('OFFSET').to_i
+
+    i = [i + ENV.fetch('OFFSET').to_i, total_rows].min
+    printf "\33[2K\r#{i}/#{total_rows} (%.2f%%)... ", i.to_f / total_rows * 100
   end
 
   puts 'done'
