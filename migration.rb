@@ -20,9 +20,7 @@ def my_clean_table(table)
   printf "Truncating #{table}... "
   my_conn.query("TRUNCATE TABLE `#{table}`")
   my_conn.query("ALTER TABLE `#{table}` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
-  if table == 'co_item'
-    my_conn.query('ALTER TABLE `co_item` CHANGE `data` `data` MEDIUMBLOB NULL;')
-  end
+  my_conn.query('ALTER TABLE `co_item` CHANGE `data` `data` MEDIUMBLOB NULL;') if table == 'co_item'
   puts 'done'
 end
 
@@ -54,7 +52,7 @@ end
 def lite_select(params = {})
   table = params[:table]
   offset = params[:offset]
-  lite_conn.execute("SELECT * FROM #{table} LIMIT #{ENV.fetch('OFFSET').to_s} OFFSET #{offset}")
+  lite_conn.execute("SELECT * FROM #{table} LIMIT #{ENV.fetch('OFFSET')} OFFSET #{offset}")
 end
 
 def my_prepare_to_insert(params = {})
@@ -68,11 +66,18 @@ def my_prepare_to_insert(params = {})
     values << '),'
   end
   my_insert_data({
-    table: params[:table],
-    columns: params[:columns],
-    values: values.gsub('(, ', '(').gsub(/\),$/, ')')
-  })
+                   table: params[:table],
+                   columns: params[:columns],
+                   values: values.gsub('(, ', '(').gsub(/\),$/, ')')
+                 })
 end
+
+def update_rowid_for(table)
+  puts 'Updating id column with rowid value...'
+  my_conn.query("UPDATE #{table} SET id = rowid WHERE id IS NULL;")
+end
+
+tables_with_null_id = %w[co_art_map co_blockdata_map co_entity_map co_material_map co_world]
 
 # Change encoding to utf8mb4 on database to support emojis
 my_conn.query("ALTER DATABASE #{ENV.fetch('MYSQL_DATABASE')} CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;")
@@ -108,6 +113,8 @@ lite_tables.each do |table|
     i = [i + ENV.fetch('OFFSET').to_i, total_rows].min
     printf "\33[2K\r#{i}/#{total_rows} (%.2f%%)... ", i.to_f / total_rows * 100
   end
+
+  update_rowid_for(table['name']) if tables_with_null_id.include?(table['name'])
 
   puts 'done'
   puts
