@@ -1,126 +1,41 @@
-require 'base64'
-require 'json'
-require_relative 'lib/my_connection'
-require_relative 'lib/lite_connection'
+# frozen_string_literal: true
 
-# Exit if .env not found
-unless File.exist?('.env')
-  warn '.env file not found.'
-  warn 'Please create it based on _env file and source it with "source .env" command.'
-  warn 'For more details, check README.md file.'
-  exit 1
-end
+# Load all necessary dependencies
+require_relative 'lib/error_handling/migration_error'
+require_relative 'lib/error_handling/connection_error'
+require_relative 'lib/error_handling/table_migration_error'
+require_relative 'lib/configuration/configuration'
+require_relative 'lib/reporting/progress_reporter'
+require_relative 'lib/database/database_optimizer'
+require_relative 'lib/formatters/value_formatter'
+require_relative 'lib/processors/table_processor'
+require_relative 'lib/migrators/core_protect_migrator'
 
-def my_conn
-  @my_conn ||= MyConnection.call
-end
+# Execute migration if script is run directly
+if __FILE__ == $PROGRAM_NAME
+  # Parse command line options
+  interactive_mode = !ARGV.include?('--non-interactive')
+  progress_file = ARGV.find { |arg| arg.start_with?('--progress-file=') }&.split('=', 2)&.last
 
-# Empty given MySQL table before migration
-def my_clean_table(table)
-  printf "Truncating #{table}... "
-  my_conn.query("TRUNCATE TABLE `#{table}`")
-  my_conn.query("ALTER TABLE `#{table}` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
-  my_conn.query('ALTER TABLE `co_item` CHANGE `data` `data` MEDIUMBLOB NULL;') if table == 'co_item'
-  puts 'done'
-end
-
-def my_insert_data(params = {})
-  table = params[:table]
-  columns = params[:columns]
-  values = params[:values]
-  my_conn.query('START TRANSACTION')
-  my_conn.query("INSERT INTO #{table} (#{columns}) VALUES #{values}")
-  my_conn.query('COMMIT')
-end
-
-def lite_conn
-  @lite_conn ||= LiteConnection.call
-end
-
-def lite_tables
-  lite_conn.execute('SELECT name FROM sqlite_master WHERE type="table" ORDER BY name;')
-end
-
-def lite_count(table)
-  lite_conn.execute("SELECT COUNT(*) FROM #{table}")[0][0]
-end
-
-def lite_table_columns(table)
-  lite_conn.prepare("SELECT * FROM #{table} LIMIT 1").columns.map { |c| c == 'id' ? 'rowid' : c }.join(',')
-end
-
-def lite_select(params = {})
-  table = params[:table]
-  offset = params[:offset]
-  lite_conn.execute("SELECT * FROM #{table} LIMIT #{ENV.fetch('OFFSET')} OFFSET #{offset}")
-end
-
-def my_prepare_to_insert(params = {})
-  values = ''
-
-  params[:rows].each do |row|
-    values << '('
-    row.each do |_field, value|
-      values << ", #{value.is_a?(String) ? "FROM_BASE64('#{Base64.encode64(value).strip}')" : value.to_json}"
-    end
-    values << '),'
-  end
-  my_insert_data({
-                   table: params[:table],
-                   columns: params[:columns],
-                   values: values.gsub('(, ', '(').gsub(/\),$/, ')')
-                 })
-end
-
-def update_rowid_for(table)
-  puts 'Updating id column with rowid value...'
-  my_conn.query("UPDATE #{table} SET id = rowid WHERE id IS NULL;")
-end
-
-tables_with_null_id = %w[co_art_map co_blockdata_map co_entity_map co_material_map co_world]
-
-# Change encoding to utf8mb4 on database to support emojis
-my_conn.query("ALTER DATABASE #{ENV.fetch('MYSQL_DATABASE')} CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;")
-
-# Commands do speed up data load
-my_conn.query('SET FOREIGN_KEY_CHECKS=0;')
-my_conn.query('SET UNIQUE_CHECKS=0;')
-my_conn.query('SET autocommit=0')
-
-# We want sqlite results to be hashes
-lite_conn.results_as_hash = true
-
-# Lets loop over the sqlite's tables
-lite_tables.each do |table|
-  # First clean the table that will be filled with data
-  my_clean_table(table['name'])
-
-  # Get columns from table
-  columns = lite_table_columns(table['name'])
-
-  # Get total fields from the given table
-  total_rows = lite_count(table['name'])
-
-  puts "Migrating #{table['name']} with #{total_rows} records..."
-  i = 0
-  until i >= total_rows
-    rows = []
-    lite_select({ table: table['name'], offset: i }).each do |row|
-      rows << row
-    end
-    my_prepare_to_insert({ table: table['name'], columns: columns, rows: rows })
-
-    i = [i + ENV.fetch('OFFSET').to_i, total_rows].min
-    printf "\33[2K\r#{i}/#{total_rows} (%.2f%%)... ", i.to_f / total_rows * 100
-  end
-
-  update_rowid_for(table['name']) if tables_with_null_id.include?(table['name'])
-
-  puts 'done'
+  puts "="*60
+  puts "COREPROTECT DATABASE MIGRATION"
+  puts "Sistema aprimorado com recovery e validação de schema"
+  puts "="*60
   puts
-end
 
-# Enable checks again
-my_conn.query('SET FOREIGN_KEY_CHECKS=1;')
-my_conn.query('SET UNIQUE_CHECKS=1;')
-my_conn.query('SET autocommit=1')
+  if interactive_mode
+    puts "Modo interativo ativado - você será consultado sobre problemas encontrados"
+  else
+    puts "Modo não-interativo - problemas serão tratados automaticamente"
+  end
+
+  puts "Arquivo de progresso: #{progress_file || 'padrão (.migration_progress.json)'}"
+  puts
+
+  migrator = CoreProtectMigrator.new(
+    interactive_mode: interactive_mode,
+    progress_file: progress_file
+  )
+
+  migrator.migrate
+end
