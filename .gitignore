@@ -2,3 +2,5 @@
 .env*
 database.db
 *.sql
+.migration_progress.json
+.rspec_status
